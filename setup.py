@@ -4,6 +4,7 @@ import os
 import platform
 import sys
 import subprocess
+import shlex
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 from distutils.errors import DistutilsExecError, DistutilsFileError
@@ -20,6 +21,22 @@ class CMakeExtension(Extension):
 
 class cmake_build_ext(build_ext):
     """Build extensions using CMake."""
+
+    user_options = [
+        *build_ext.user_options,
+        ('cmake-config-args=', None, ''),
+        ('cmake-build-args=', None, '')
+    ]
+
+    def initialize_options(self):
+        build_ext.initialize_options(self)
+        self.cmake_config_args = ''
+        self.cmake_build_args = ''
+
+    def finalize_options(self):
+        build_ext.finalize_options(self)
+        self.cmake_config_args = shlex.split(self.cmake_config_args)
+        self.cmake_build_args = shlex.split(self.cmake_build_args)
 
     def spawn(self, cmd, dry_run=False, cwd=None):
         cmd = list(cmd)
@@ -42,8 +59,8 @@ class cmake_build_ext(build_ext):
         # Ensure that CMake is present and working
         try:
             self.spawn(['cmake', '--version'])
-        except OSError:
-            raise RuntimeError('cannot find CMake executable')
+        except DistutilsExecError:
+            raise DistutilsExecError('cannot find CMake executable')
 
         for ext in self.extensions:
 
@@ -84,21 +101,15 @@ class cmake_build_ext(build_ext):
                     cmake_args += [
                         '-DCMAKE_GENERATOR_PLATFORM=%s' % plat,
                     ]
-                # else:
-                #     cmake_args += [
-                #         '-G', 'MinGW Makefiles',
-                #     ]
-
-            # cmake_args += cmake_cmd_args
 
             os.makedirs(self.build_temp, exist_ok=True)
 
             # Config
-            self.spawn(['cmake', ext.cmake_source_dir] + cmake_args, dry_run=self.dry_run,
+            self.spawn(['cmake', ext.cmake_source_dir] + cmake_args + self.cmake_config_args, dry_run=self.dry_run,
                        cwd=self.build_temp)
 
             # Build
-            self.spawn(['cmake', '--build', '.', '--config', cfg], dry_run=self.dry_run,
+            self.spawn(['cmake', '--build', '.', '--config', cfg] + self.cmake_build_args, dry_run=self.dry_run,
                        cwd=self.build_temp)
 
 
