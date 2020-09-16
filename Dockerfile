@@ -14,5 +14,4 @@ ENV PATH="/opt/cmake-3.16.0-Linux-x86_64/bin:${PATH}"
 
 WORKDIR /openpose
 COPY . .
-WORKDIR /openpose/python
 RUN python3 setup.py sdist bdist_wheel
